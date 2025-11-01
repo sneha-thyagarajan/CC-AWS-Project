@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <title>Object Detection — Flask + TensorFlow</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+
+<body>
+  <header>
+    <h1>🔍 Real-Time Object Detection</h1>
+    <p class="subtitle">Powered by TensorFlow SSD Mobilenet & Flask</p>
+  </header>
+
+  <main>
+    <div class="container">
+      <!-- Webcam Section -->
+      <section class="card">
+        <h2>🎥 Live Webcam</h2>
+        <video id="webcam" autoplay playsinline></video>
+        <div class="controls">
+          <button id="startBtn" class="primary">Start Webcam</button>
+          <button id="stopBtn" class="danger">Stop</button>
+          <label>Interval (ms):
+            <input id="interval" type="number" value="500" min="100">
+          </label>
+        </div>
+        <h3>Detected Output</h3>
+        <img id="annotatedImg" alt="Annotated webcam output">
+      </section>
+
+      <!-- Upload Section -->
+      <section class="card">
+        <h2>🖼️ Image Upload</h2>
+        <form id="uploadForm" enctype="multipart/form-data">
+          <input type="file" id="imageInput" name="image" accept="image/*" />
+          <button type="submit" class="primary">Upload & Detect</button>
+        </form>
+        <h3>Detected Output</h3>
+        <img id="uploadResult" alt="Upload detection result">
+      </section>
+
+    </div>
+  </main>
+
+  <footer>
+    <p>Made with 💙 Flask + TensorFlow + OpenCV</p>
+  </footer>
+
+  <script src="{{ url_for('static', filename='main.js') }}"></script>
+</body>
+
+</html>
