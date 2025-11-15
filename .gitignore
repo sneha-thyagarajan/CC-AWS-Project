@@ -3,6 +3,7 @@ tensorflow_env/
 venv/
 env/
 ENV/
+*.venv/
 
 # Python cache files
 __pycache__/
