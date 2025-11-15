@@ -11,7 +11,7 @@ app = Flask(__name__)
 
 # ---------------- CONFIG ----------------
 # Switch to more accurate model
-MODEL_URL = "https://tfhub.dev/tensorflow/efficientdet/d1/1"
+MODEL_URL = "https://tfhub.dev/tensorflow/ssd_mobilenet_v2/2"
 DETECTION_THRESHOLD = 0.5  # Increase threshold to filter low-confidence detections
 lock = threading.Lock()
 
@@ -27,7 +27,7 @@ COCO_LABELS = [
     'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush'
 ]
 
-print("🔄 Loading TensorFlow EfficientDet model (this may take ~2 minutes)...")
+print("🔄 Loading TensorFlow SSD model ...")
 detector = hub.load(MODEL_URL)
 print("✅ Model loaded successfully!")
 
@@ -268,6 +268,7 @@ def detect_frame():
     annotated = annotate_image_pil(image_pil, boxes, classes, scores)
     buf = pil_to_jpeg_bytes(annotated, quality=70)
     return send_file(buf, mimetype="image/jpeg")
+
 
 if __name__ == "__main__":
     app.run(debug=True, host="127.0.0.1", port=5000)
