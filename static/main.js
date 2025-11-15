@@ -86,5 +86,33 @@ uploadForm.addEventListener("submit", async (e) => {
   uploadResult.src = url;
   setTimeout(() => URL.revokeObjectURL(url), 3000);
 });
+// ================== HISTORY SECTION ==================
+const viewHistoryBtn = document.getElementById("viewHistoryBtn");
+const historySection = document.getElementById("historySection");
+const historyGrid = document.getElementById("historyGrid");
+
+viewHistoryBtn.addEventListener("click", async () => {
+  const res = await fetch("/get_detected_images");
+  if (!res.ok) {
+    alert("Failed to fetch detected images!");
+    return;
+  }
+  const data = await res.json();
+  const images = data.images || [];
+  historyGrid.innerHTML = "";
+  if (images.length === 0) {
+    historyGrid.innerHTML = "<p>No detected images yet.</p>";
+  } else {
+    images.forEach(url => {
+      const img = document.createElement("img");
+      img.src = url;
+      img.alt = "Detected Image";
+      img.className = "history-img";
+      historyGrid.appendChild(img);
+    });
+  }
+  historySection.classList.toggle("hidden");
+});
+
 
 window.addEventListener("beforeunload", stopWebcam);

@@ -1,4 +1,5 @@
-* {
+/* Clean modern style */
+body {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
@@ -252,6 +253,15 @@ button:active {
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
 }
 
+button.secondary {
+  background: #3b82f6;
+  color: white;
+}
+
+button.secondary:hover {
+  background: #2563eb;
+}
+
 #imageInput:focus {
   outline: none;
   border-color: #764ba2;
@@ -342,116 +352,68 @@ button:active {
 
 footer {
   text-align: center;
-  padding: 30px;
-  color: rgba(255, 255, 255, 0.95);
-  font-size: 1.05rem;
-  margin-top: 50px;
-  font-weight: 500;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 0.8rem 0;
+  color: #b5c6e0;
+  background: rgba(255,255,255,0.05);
+  margin-top: auto;
 }
 
-/* Responsive Design */
-@media (max-width: 1100px) {
-  .container {
-    grid-template-columns: 1fr;
-  }
+/* Centered history control button */
+.history-control {
+  text-align: center;
+  margin: 1rem auto 0;
 }
 
-@media (max-width: 768px) {
-  body {
-    padding: 15px;
-  }
-
-  header {
-    padding: 30px 15px;
-    margin-bottom: 30px;
-  }
-
-  h1 {
-    font-size: 2.2rem;
-  }
-
-  .subtitle {
-    font-size: 1rem;
-  }
-
-  .card {
-    padding: 25px;
-  }
-
-  .card h2 {
-    font-size: 1.4rem;
-  }
-
-  .controls {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .controls label {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .controls input[type="number"] {
-    width: 100px;
-  }
-
-  button {
-    width: 100%;
-  }
-
-  .secondary {
-    padding: 14px 28px;
-    font-size: 1.05rem;
-  }
-
-  .gallery {
-    padding: 25px;
-  }
-
-  .gallery h2 {
-    font-size: 1.6rem;
-  }
-
-  #historyGrid {
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 15px;
-  }
+.gallery {
+  margin: 1rem auto 2rem;
+  padding: 1rem 2rem;
+  width: 90%;
+  max-width: 1000px;
+  background: rgba(255,255,255,0.05);
+  border-top: 1px solid rgba(255,255,255,0.2);
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  transition: all 0.4s ease-in-out;
 }
 
-@media (max-width: 480px) {
-  h1 {
-    font-size: 1.8rem;
-  }
-
-  .card {
-    padding: 20px;
-  }
-
-  .uploadResultContainer {
-    min-height: 200px;
-  }
-
-  #historyGrid {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 12px;
-  }
+.gallery h2 {
+  color: #00c3ff;
+  text-align: center;
+  margin-top: 0;
 }
 
-/* Loading animation for images */
-@keyframes shimmer {
-  0% {
-    background-position: -1000px 0;
-  }
-  100% {
-    background-position: 1000px 0;
-  }
+#historyGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
 }
 
-.uploadResultContainer:empty::after {
-  content: 'Waiting for detection...';
-  color: #999;
-  font-size: 1rem;
-  font-weight: 500;
+.history-img {
+  width: 100%;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.history-img:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.6);
+}
+
+.hidden {
+  display: none;
+}
+
+.uploadResultContainer {
+  background-color: #1a1f2c;
+  text-align: center;
+  margin-top: 1rem;
+  border-radius: 10px;
+}
+.history{
+  text-align: center;
+  margin-top: 1rem;
+  position: relative;
+
 }

@@ -45,21 +45,17 @@
         </section>
     </div>
 
+
     <!-- History Gallery -->
-    <div class="history">
-        <button id="viewHistoryBtn" class="secondary">📸 View Detected Images</button>
-    </div>
-
+     <div class="history">
+          <button id="viewHistoryBtn" class="secondary">📸 View Detected Images</button>
+        </div>
     <section id="historySection" class="gallery hidden">
-        <h2>🗂️ Detected Images History</h2>
-        <div id="historyGrid"></div>
+      <div id="historyGrid"></div>
     </section>
-</main>
+  </main>
 
-<footer>
-    <p>Made with 💙 Flask + TensorFlow + OpenCV</p>
-</footer>
-
+ 
 <script src="{{ url_for('static', filename='main.js') }}"></script>
 </body>
 </html>
