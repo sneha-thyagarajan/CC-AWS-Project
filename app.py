@@ -1,4 +1,4 @@
-# app.py
+
 import io
 import os
 import base64
@@ -11,8 +11,13 @@ import tensorflow as tf
 import tensorflow_hub as hub
 from werkzeug.utils import secure_filename
 
+# --- NEW imports for S3 ---
+import boto3
+from botocore.exceptions import ClientError
+
 # ---------------- App setup ----------------
 app = Flask(__name__)
+# local detected dir kept for compatibility (not used for saving if S3 is configured)
 app.config["DETECTED_DIR"] = os.path.join("static", "detected")
 os.makedirs(app.config["DETECTED_DIR"], exist_ok=True)
 
@@ -20,6 +25,22 @@ os.makedirs(app.config["DETECTED_DIR"], exist_ok=True)
 MODEL_URL = "https://tfhub.dev/tensorflow/ssd_mobilenet_v2/2"
 DETECTION_THRESHOLD = 0.5  # filter detections below this confidence
 lock = threading.Lock()
+
+# S3 configuration: read from environment variables
+app.config["S3_BUCKET"] = os.environ.get("S3_BUCKET", "s3-objectdetection-folder")
+app.config["AWS_REGION"] = os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "ap-south-1"))
+
+# Create an S3 client. boto3 will pick up credentials from env vars, shared credentials file, or IAM role.
+s3_client = None
+if app.config["S3_BUCKET"]:
+    try:
+        s3_client = boto3.client("s3", region_name=app.config["AWS_REGION"])
+        app.logger.info("S3 client initialized for bucket: %s (region=%s)", app.config["S3_BUCKET"], app.config["AWS_REGION"])
+    except Exception as e:
+        app.logger.exception("Failed to initialize S3 client: %s", e)
+        s3_client = None
+else:
+    app.logger.info("No S3_BUCKET configured. Falling back to local detected folder for persistence.")
 
 COCO_LABELS = [
     'background', 'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat',
@@ -58,11 +79,8 @@ def pil_to_jpeg_bytes(pil_img: Image.Image, quality: int = 85):
     buf.seek(0)
     return buf
 
-def save_annotated_image(pil_img: Image.Image, prefix="detected"):
-    """
-    Save annotated PIL image to the detected folder and return (filepath, url_path).
-    Uses an UTC timestamp to ensure unique filenames.
-    """
+def _local_save_annotated_image(pil_img: Image.Image, prefix="detected"):
+    """Fallback local save (kept for compatibility/testing)."""
     os.makedirs(app.config["DETECTED_DIR"], exist_ok=True)
     timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%S%f")
     filename = f"{prefix}_{timestamp}.jpg"
@@ -71,6 +89,50 @@ def save_annotated_image(pil_img: Image.Image, prefix="detected"):
     pil_img.save(filepath, format="JPEG", quality=90)
     url = url_for("static", filename=f"detected/{filename}", _external=False)
     return filepath, url
+
+def save_annotated_image(pil_img: Image.Image, prefix="detected"):
+    """
+    Upload the annotated PIL image to S3 and return (s3_key, url).
+    If S3 is not configured, save to local detected folder and return local path+url.
+    """
+    # prepare image bytes
+    buf = io.BytesIO()
+    pil_img.save(buf, format="JPEG", quality=90)
+    buf.seek(0)
+    image_bytes = buf.read()
+
+    timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%S%f")
+    filename = f"{prefix}_{timestamp}.jpg"
+    filename = secure_filename(filename)
+    s3_bucket = app.config.get("S3_BUCKET", "")
+
+    if s3_client and s3_bucket:
+        s3_key = f"detected/{filename}"
+        try:
+            s3_client.put_object(
+                Bucket=s3_bucket,
+                Key=s3_key,
+                Body=image_bytes,
+                ContentType="image/jpeg",
+                ACL="private"  # prefer private + presigned URLs
+            )
+            # create presigned URL
+            presigned_url = s3_client.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": s3_bucket, "Key": s3_key},
+                ExpiresIn=3600
+            )
+            return s3_key, presigned_url
+        except ClientError as e:
+            current_app.logger.exception("Failed to upload to S3: %s", e)
+            # fall back to local save
+            try:
+                return _local_save_annotated_image(pil_img, prefix=prefix)
+            except Exception:
+                raise
+    else:
+        # S3 not configured: local save
+        return _local_save_annotated_image(pil_img, prefix=prefix)
 
 def annotate_image_pil(image_pil: Image.Image, boxes, classes, scores, threshold=DETECTION_THRESHOLD):
     draw = ImageDraw.Draw(image_pil)
@@ -231,12 +293,12 @@ def detect_upload():
         if original_size != processed.size:
             annotated = annotated.resize(original_size, Image.Resampling.LANCZOS)
 
-        # --- SAVE annotated image (only for uploads) ---
+        # --- SAVE annotated image (upload to S3 or local fallback) ---
         try:
-            filepath, url = save_annotated_image(annotated, prefix="upload")
-            current_app.logger.info("Saved annotated upload: %s", filepath)
+            storage_key, url = save_annotated_image(annotated, prefix="upload")
+            current_app.logger.info("Saved annotated upload: %s (key=%s)", url, storage_key)
         except Exception as e:
-            current_app.logger.warning("Failed to save annotated upload: %s", e)
+            current_app.logger.warning("Failed to persist annotated upload: %s", e)
 
         buf = pil_to_jpeg_bytes(annotated, quality=95)
         return send_file(buf, mimetype="image/jpeg")
@@ -277,13 +339,49 @@ def detect_frame():
 @app.route("/get_detected_images", methods=["GET"])
 def get_detected_images():
     try:
-        images = sorted(os.listdir(app.config["DETECTED_DIR"]), reverse=True)
-        urls = [url_for('static', filename=f"detected/{img}") for img in images]
-        return jsonify({"images": urls})
+        s3_bucket = app.config.get("S3_BUCKET", "")
+        if s3_client and s3_bucket:
+            prefix = "detected/"
+            paginator = s3_client.get_paginator("list_objects_v2")
+            page_iterator = paginator.paginate(Bucket=s3_bucket, Prefix=prefix)
+
+            all_objs = []
+            for page in page_iterator:
+                contents = page.get("Contents", [])
+                for obj in contents:
+                    all_objs.append(obj)
+
+            # sort all objects by LastModified desc
+            all_objs.sort(key=lambda o: o.get("LastModified", datetime.min), reverse=True)
+
+            urls = []
+            for obj in all_objs:
+                key = obj["Key"]
+                try:
+                    url = s3_client.generate_presigned_url(
+                        "get_object",
+                        Params={"Bucket": s3_bucket, "Key": key},
+                        ExpiresIn=3600
+                    )
+                except ClientError:
+                    url = f"https://{s3_bucket}.s3.{app.config['AWS_REGION']}.amazonaws.com/{key}"
+                urls.append(url)
+            return jsonify({"images": urls})
+        else:
+            # fallback to local folder listing
+            images = sorted(os.listdir(app.config["DETECTED_DIR"]), reverse=True)
+            urls = [url_for('static', filename=f"detected/{img}") for img in images]
+            return jsonify({"images": urls})
     except Exception as e:
         current_app.logger.exception("Error listing detected images")
         return jsonify({"error": str(e)}), 500
 
 # ---------------- Run ----------------
 if __name__ == "__main__":
+    # Helpful startup logs
+    if app.config.get("S3_BUCKET"):
+        app.logger.info("App configured to upload detected images to S3 bucket: %s", app.config.get("S3_BUCKET"))
+    else:
+        app.logger.info("App configured to store detected images locally in: %s", app.config.get("DETECTED_DIR"))
+
     app.run(debug=True, host="127.0.0.1", port=5000)
